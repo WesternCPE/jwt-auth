@@ -14,19 +14,58 @@
  * @package jwt-auth
  */
 
-defined( 'ABSPATH' ) || die( "Can't access directly" );
+// add_action( 'rest_api_init', 'register_jwt_auth');
+// function register_jwt_auth() {
+// } 
 
+defined( 'ABSPATH' ) || die( "Can't access directly" );
+	
 // Helper constants.
 define( 'JWT_AUTH_PLUGIN_DIR', rtrim( plugin_dir_path( __FILE__ ), '/' ) );
 define( 'JWT_AUTH_PLUGIN_URL', rtrim( plugin_dir_url( __FILE__ ), '/' ) );
 define( 'JWT_AUTH_PLUGIN_VERSION', '3.0.1' );
 
-// Require composer.
-require __DIR__ . '/vendor/autoload.php';
+if ( !function_exists( 'is_rest' ) ) {
+    /**
+     * Checks if the current request is a WP REST API request.
+     *
+     * Case #1: After WP_REST_Request initialisation
+     * Case #2: Support "plain" permalink settings and check if `rest_route` starts with `/`
+     * Case #3: It can happen that WP_Rewrite is not yet initialized,
+     *          so do this (wp-settings.php)
+     * Case #4: URL Path begins with wp-json/ (your REST prefix)
+     *          Also supports WP installations in subfolders
+     *
+     * @returns boolean
+     * @author matzeeable
+     */
+    function is_rest() {
+        if (defined('REST_REQUEST') && REST_REQUEST // (#1)
+                || isset($_GET['rest_route']) // (#2)
+                        && strpos( $_GET['rest_route'], '/', 0 ) === 0)
+                return true;
 
-// Require classes.
-require __DIR__ . '/class-auth.php';
-require __DIR__ . '/class-setup.php';
-require __DIR__ . '/class-devices.php';
+        // (#3)
+        global $wp_rewrite;
+        if ($wp_rewrite === null) $wp_rewrite = new WP_Rewrite();
+            
+        // (#4)
+        $rest_url = wp_parse_url( trailingslashit( rest_url( ) ) );
+        $current_url = wp_parse_url( add_query_arg( array( ) ) );
+        return strpos( $current_url['path'] ?? '/', $rest_url['path'], 0 ) === 0;
+    }
+}
 
-JWTAuth\Setup::getInstance();
+
+if( is_rest() ){
+	// Require composer.
+	require JWT_AUTH_PLUGIN_DIR . '/vendor/autoload.php';
+	
+	// Require classes.
+	require JWT_AUTH_PLUGIN_DIR . '/class-auth.php';
+	require JWT_AUTH_PLUGIN_DIR . '/class-setup.php';
+	require JWT_AUTH_PLUGIN_DIR . '/class-devices.php';
+	
+	JWTAuth\Setup::getInstance();
+}
+
